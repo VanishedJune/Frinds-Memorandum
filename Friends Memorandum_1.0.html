@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friends Memorandum</title>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f7fa;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+        }
+        
+        /* 左侧统计面板 */
+        .sidebar {
+            width: 320px;
+            background: #fff;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+            color: #fff;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .chart-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .chart-box {
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+        }
+        
+        .chart-title {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .chart {
+            width: 100%;
+            height: 200px;
+        }
+        
+        .rank-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .rank-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        
+        .rank-item:last-child {
+            border-bottom: none;
+        }
+        
+        .rank-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .rank-item.top3 .rank-num {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .rank-info {
+            flex: 1;
+        }
+        
+        .rank-name {
+            color: #333;
+            margin-bottom: 2px;
+        }
+        
+        .rank-count {
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .rank-bar {
+            width: 60px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+        
+        .rank-bar-fill {
+            height: 100%;
+            background: #1890ff;
+            border-radius: 2px;
+        }
+        
+        /* 右侧地图区域 */
+        .map-area {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* 顶部标题栏 */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .header .stats {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .header .stats span {
+            color: #1890ff;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+        
+        /* 返回按钮 */
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+        
+        .back-btn.show {
+            display: block;
+        }
+        
+        /* 图例 */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        
+        .legend h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        /* 操作按钮 */
+        .actions {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .action-btn {
+            background: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .action-btn:hover {
+            background: #1890ff;
+            color: #fff;
+            transform: translateY(-2px);
+        }
+        
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #fff;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+        
+        .name-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f7fa;
+            border-radius: 8px;
+        }
+        
+        .name-tag {
+            display: inline-block;
+            background: #1890ff;
+            color: #fff;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 13px;
+            position: relative;
+        }
+        
+        .name-tag .delete {
+            margin-left: 8px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        
+        .name-tag .delete:hover {
+            opacity: 1;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .modal-btn.primary {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .modal-btn.primary:hover {
+            background: #40a9ff;
+        }
+        
+        .modal-btn.secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .modal-btn.secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        /* 提示消息 */
+        .toast {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 20px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 3000;
+            pointer-events: none;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- 左侧统计面板 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>📊 数据统计</h2>
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="number" id="sidebarTotal">0</div>
+                        <div class="label">总同学数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="sidebarCities">0</div>
+                        <div class="label">覆盖城市</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="sidebarProvinces">0</div>
+                        <div class="label">覆盖省份</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" id="sidebarAvg">0</div>
+                        <div class="label">平均/城市</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <!-- 省份分布图 -->
+                <div class="chart-box">
+                    <div class="chart-title">🏆 省份分布排行</div>
+                    <div class="rank-list" id="provinceRank"></div>
+                </div>
+                
+                <!-- 城市分布图 -->
+                <div class="chart-box">
+                    <div class="chart-title">🏙️ 城市分布排行 (Top 10)</div>
+                    <div class="rank-list" id="cityRank"></div>
+                </div>
+                
+                <!-- 人数分布饼图 -->
+                <div class="chart-box">
+                    <div class="chart-title">📈 人数分布区间</div>
+                    <div id="pieChart" class="chart"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧地图区域 -->
+        <div class="map-area">
+            <div class="header">
+                <h1>🗺️ Friends Memorandum</h1>
+                <div class="stats">
+                    已记录 <span id="totalCount">0</span> 位同学，分布在 <span id="cityCount">0</span> 个城市
+                </div>
+            </div>
+            
+            <button class="back-btn" id="backBtn" onclick="goBack()">← 返回全国</button>
+            
+            <div id="map"></div>
+            
+            <div class="legend">
+                <h3>📊 颜色说明</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #E0E0E0"></div>
+                    <span>无同学</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(179, 217, 255, 0.6)"></div>
+                    <span>1-3人（淡蓝）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(102, 178, 255, 0.7)"></div>
+                    <span>4-6人（中蓝）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(26, 140, 255, 0.8)"></div>
+                    <span>7-10人（深蓝）</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: rgba(0, 102, 204, 0.9)"></div>
+                    <span>10人以上（极深蓝）</span>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="action-btn" onclick="exportData()">📥 导出数据</button>
+                <button class="action-btn" onclick="clearAll()">🗑️ 清空重置</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加/编辑弹窗 -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="modalTitle">添加同学</h3>
+            <div class="input-group">
+                <label>当前城市：<span id="currentCity" style="color: #1890ff; font-weight: bold;"></span></label>
+            </div>
+            <div class="input-group">
+                <label>已添加的同学：</label>
+                <div class="name-list" id="nameList">
+                    <span style="color: #999; font-size: 13px;">暂无同学</span>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>输入姓名（多个用逗号分隔）：</label>
+                <input type="text" id="nameInput" placeholder="例如：张三, 李四" onkeypress="handleEnter(event)">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal()">取消</button>
+                <button class="modal-btn primary" onclick="addNames()">添加</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 数据存储
+        let classmateData = JSON.parse(localStorage.getItem('classmateMap')) || {};
+        let currentProvince = 'china';
+        let currentCityName = '';
+        let currentAdcode = '100000';
+        let mapStack = [{ name: 'china', adcode: '100000', displayName: '中国' }];
+        let provinceGeoData = {}; // 存储省份地理数据
+        
+        // 初始化图表
+        const myChart = echarts.init(document.getElementById('map'));
+        const pieChart = echarts.init(document.getElementById('pieChart'));
+        
+        // 颜色计算函数
+        function getColorByCount(count) {
+            if (count === 0) return '#E0E0E0';
+            if (count <= 3) return `rgba(179, 217, 255, ${0.3 + count * 0.1})`;
+            if (count <= 6) return `rgba(102, 178, 255, ${0.5 + (count - 3) * 0.067})`;
+            if (count <= 10) return `rgba(26, 140, 255, ${0.6 + (count - 6) * 0.05})`;
+            return `rgba(0, 102, 204, ${Math.min(0.7 + (count - 10) * 0.02, 0.95)})`;
+        }
+        
+        // 获取省份的总人数（包括所有下属城市）
+        function getProvinceTotalCount(provinceName) {
+            let total = 0;
+            const prefix = provinceName + '-';
+            for (let key in classmateData) {
+                if (key === provinceName || key.startsWith(prefix)) {
+                    total += classmateData[key].length;
+                }
+            }
+            return total;
+        }
+        
+        // 获取城市的学生数量
+        function getStudentCount(province, city) {
+            const key = province === '中国' ? city : `${province}-${city}`;
+            return (classmateData[key] || []).length;
+        }
+        
+        // 获取学生名单
+        function getStudentNames(province, city) {
+            const key = province === '中国' ? city : `${province}-${city}`;
+            return classmateData[key] || [];
+        }
+        
+        // 加载地图
+        async function loadMap(adcode, name, displayName) {
+            try {
+                const url = `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('地图加载失败');
+                
+                const geoJson = await response.json();
+                echarts.registerMap(name, geoJson);
+                
+                // 存储省份地理数据（用于全国视图计算）
+                if (displayName === '中国') {
+                    geoJson.features.forEach(feature => {
+                        provinceGeoData[feature.properties.name] = {
+                            adcode: feature.properties.adcode,
+                            center: feature.properties.center
+                        };
+                    });
+                }
+                
+                // 构建名称到属性的映射
+                const nameMap = {};
+                geoJson.features.forEach(feature => {
+                    nameMap[feature.properties.name] = {
+                        adcode: feature.properties.adcode,
+                        center: feature.properties.center
+                    };
+                });
+                
+                // 准备地图数据
+                const mapData = Object.keys(nameMap).map(regionName => {
+                    let count;
+                    if (displayName === '中国') {
+                        // 全国视图：计算该省份所有下属城市的总和
+                        count = getProvinceTotalCount(regionName);
+                    } else {
+                        // 省份视图：计算该城市的人数
+                        count = getStudentCount(displayName, regionName);
+                    }
+                    
+                    return {
+                        name: regionName,
+                        value: count,
+                        itemStyle: {
+                            areaColor: getColorByCount(count),
+                            borderColor: '#fff',
+                            borderWidth: 1
+                        },
+                        emphasis: {
+                            itemStyle: {
+                                areaColor: '#ffd666'
+                            }
+                        }
+                    };
+                });
+                
+                const option = {
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function(params) {
+                            const count = params.value || 0;
+                            let html = `<div style="font-weight: bold; margin-bottom: 5px;">${params.name}</div>`;
+                            
+                            if (displayName === '中国') {
+                                // 全国视图：显示省份总人数
+                                html += `<div>总人数：${count} 人</div>`;
+                                // 显示该省份下的城市分布
+                                const cityData = getProvinceCityData(params.name);
+                                if (cityData.length > 0) {
+                                    html += `<div style="margin-top: 8px; font-size: 12px; max-width: 250px;">`;
+                                    cityData.forEach(city => {
+                                        html += `<div style="margin: 3px 0;">• ${city.name}: ${city.count}人</div>`;
+                                    });
+                                    html += `</div>`;
+                                }
+                            } else {
+                                // 省份视图：显示城市具体名单
+                                html += `<div>同学数量：${count} 人</div>`;
+                                const names = getStudentNames(displayName, params.name);
+                                if (names.length > 0) {
+                                    html += `<div style="margin-top: 5px; max-width: 200px; word-wrap: break-word;">名单：${names.join('、')}</div>`;
+                                }
+                            }
+                            return html;
+                        },
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                        textStyle: {
+                            color: '#333'
+                        }
+                    },
+                    series: [{
+                        type: 'map',
+                        map: name,
+                        roam: true,
+                        zoom: 1.2,
+                        label: {
+                            show: true,
+                            fontSize: 12,
+                            color: '#333'
+                        },
+                        data: mapData,
+                        itemStyle: {
+                            borderColor: '#999',
+                            borderWidth: 0.5
+                        },
+                        emphasis: {
+                            label: {
+                                show: true,
+                                color: '#000',
+                                fontWeight: 'bold'
+                            }
+                        }
+                    }]
+                };
+                
+                myChart.setOption(option, true);
+                
+                // 绑定点击事件
+                myChart.off('click');
+                myChart.on('click', async function(params) {
+                    const regionInfo = nameMap[params.name];
+                    if (!regionInfo) return;
+                    
+                    // 检查是否有下级
+                    const testUrl = `https://geo.datav.aliyun.com/areas_v3/bound/${regionInfo.adcode}_full.json`;
+                    const testRes = await fetch(testUrl, { method: 'HEAD' });
+                    
+                    if (testRes.ok && displayName === '中国') {
+                        // 下钻到省份
+                        currentProvince = params.name;
+                        mapStack.push({ 
+                            name: params.name, 
+                            adcode: regionInfo.adcode, 
+                            displayName: params.name 
+                        });
+                        document.getElementById('backBtn').classList.add('show');
+                        loadMap(regionInfo.adcode, params.name, params.name);
+                    } else {
+                        // 打开添加弹窗（市级或无法下钻的省级）
+                        openModal(params.name);
+                    }
+                });
+                
+                updateStats();
+                updateCharts();
+                
+            } catch (error) {
+                console.error('地图加载失败:', error);
+                showToast('地图加载失败，请检查网络');
+            }
+        }
+        
+        // 获取省份下的城市数据
+        function getProvinceCityData(provinceName) {
+            const cities = [];
+            const prefix = provinceName + '-';
+            for (let key in classmateData) {
+                if (key.startsWith(prefix)) {
+                    const cityName = key.substring(prefix.length);
+                    cities.push({
+                        name: cityName,
+                        count: classmateData[key].length
+                    });
+                }
+            }
+            return cities.sort((a, b) => b.count - a.count);
+        }
+        
+        // 返回上级
+        function goBack() {
+            if (mapStack.length <= 1) return;
+            mapStack.pop();
+            const prev = mapStack[mapStack.length - 1];
+            currentProvince = prev.name === 'china' ? 'china' : mapStack[mapStack.length - 2]?.name || 'china';
+            
+            if (mapStack.length === 1) {
+                document.getElementById('backBtn').classList.remove('show');
+            }
+            loadMap(prev.adcode, prev.name, prev.displayName);
+        }
+        
+        // 打开弹窗
+        function openModal(cityName) {
+            currentCityName = cityName;
+            const provinceName = mapStack[mapStack.length - 1].displayName;
+            const key = provinceName === '中国' ? cityName : `${provinceName}-${cityName}`;
+            const names = classmateData[key] || [];
+            
+            document.getElementById('currentCity').textContent = cityName;
+            document.getElementById('modalTitle').textContent = names.length > 0 ? '管理同学' : '添加同学';
+            updateNameList(names);
+            document.getElementById('modal').classList.add('show');
+            document.getElementById('nameInput').focus();
+        }
+        
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+            document.getElementById('nameInput').value = '';
+        }
+        
+        // 更新名单显示
+        function updateNameList(names) {
+            const container = document.getElementById('nameList');
+            if (names.length === 0) {
+                container.innerHTML = '<span style="color: #999; font-size: 13px;">暂无同学</span>';
+                return;
+            }
+            container.innerHTML = names.map((name, index) => 
+                `<span class="name-tag">${name}<span class="delete" onclick="deleteName(${index})">×</span></span>`
+            ).join('');
+        }
+        
+        // 添加姓名
+        function addNames() {
+            const input = document.getElementById('nameInput');
+            const value = input.value.trim();
+            if (!value) {
+                showToast('请输入姓名');
+                return;
+            }
+            
+            const provinceName = mapStack[mapStack.length - 1].displayName;
+            const key = provinceName === '中国' ? currentCityName : `${provinceName}-${currentCityName}`;
+            
+            if (!classmateData[key]) {
+                classmateData[key] = [];
+            }
+            
+            const newNames = value.split(/[,，]/).map(n => n.trim()).filter(n => n);
+            classmateData[key].push(...newNames);
+            
+            saveData();
+            updateNameList(classmateData[key]);
+            input.value = '';
+            
+            // 刷新地图颜色
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+            
+            showToast(`成功添加 ${newNames.length} 位同学`);
+        }
+        
+        // 删除姓名
+        function deleteName(index) {
+            const provinceName = mapStack[mapStack.length - 1].displayName;
+            const key = provinceName === '中国' ? currentCityName : `${provinceName}-${currentCityName}`;
+            
+            classmateData[key].splice(index, 1);
+            if (classmateData[key].length === 0) {
+                delete classmateData[key];
+            }
+            
+            saveData();
+            const names = classmateData[key] || [];
+            updateNameList(names);
+            
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+            
+            showToast('已删除');
+        }
+        
+        // 回车添加
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                addNames();
+            }
+        }
+        
+        // 保存数据
+        function saveData() {
+            localStorage.setItem('classmateMap', JSON.stringify(classmateData));
+            updateStats();
+            updateCharts();
+        }
+        
+        // 更新顶部统计
+        function updateStats() {
+            let total = 0;
+            let cities = 0;
+            let provinces = new Set();
+            
+            for (let key in classmateData) {
+                const count = classmateData[key].length;
+                total += count;
+                if (count > 0) {
+                    cities++;
+                    // 提取省份名
+                    if (key.includes('-')) {
+                        provinces.add(key.split('-')[0]);
+                    } else {
+                        provinces.add(key);
+                    }
+                }
+            }
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('cityCount').textContent = cities;
+            
+            // 更新侧边栏统计
+            document.getElementById('sidebarTotal').textContent = total;
+            document.getElementById('sidebarCities').textContent = cities;
+            document.getElementById('sidebarProvinces').textContent = provinces.size;
+            document.getElementById('sidebarAvg').textContent = cities > 0 ? (total / cities).toFixed(1) : 0;
+        }
+        
+        // 更新图表
+        function updateCharts() {
+            updateProvinceRank();
+            updateCityRank();
+            updatePieChart();
+        }
+        
+        // 省份排行
+        function updateProvinceRank() {
+            const provinceStats = {};
+            
+            for (let key in classmateData) {
+                const count = classmateData[key].length;
+                let province;
+                if (key.includes('-')) {
+                    province = key.split('-')[0];
+                } else {
+                    province = key;
+                }
+                
+                provinceStats[province] = (provinceStats[province] || 0) + count;
+            }
+            
+            const sorted = Object.entries(provinceStats)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const maxCount = sorted.length > 0 ? sorted[0][1] : 1;
+            
+            const html = sorted.map((item, index) => `
+                <div class="rank-item ${index < 3 ? 'top3' : ''}">
+                    <div class="rank-num">${index + 1}</div>
+                    <div class="rank-info">
+                        <div class="rank-name">${item[0]}</div>
+                        <div class="rank-count">${item[1]} 人</div>
+                    </div>
+                    <div class="rank-bar">
+                        <div class="rank-bar-fill" style="width: ${(item[1] / maxCount * 100)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('provinceRank').innerHTML = html || '<div style="padding: 20px; color: #999; text-align: center;">暂无数据</div>';
+        }
+        
+        // 城市排行
+        function updateCityRank() {
+            const cityStats = [];
+            
+            for (let key in classmateData) {
+                const count = classmateData[key].length;
+                if (count > 0) {
+                    let displayName = key;
+                    if (key.includes('-')) {
+                        const parts = key.split('-');
+                        displayName = `${parts[0]}·${parts[1]}`;
+                    }
+                    cityStats.push({ name: displayName, count: count, fullKey: key });
+                }
+            }
+            
+            const sorted = cityStats.sort((a, b) => b.count - a.count).slice(0, 10);
+            const maxCount = sorted.length > 0 ? sorted[0].count : 1;
+            
+            const html = sorted.map((item, index) => `
+                <div class="rank-item ${index < 3 ? 'top3' : ''}">
+                    <div class="rank-num">${index + 1}</div>
+                    <div class="rank-info">
+                        <div class="rank-name">${item.name}</div>
+                        <div class="rank-count">${item.count} 人</div>
+                    </div>
+                    <div class="rank-bar">
+                        <div class="rank-bar-fill" style="width: ${(item.count / maxCount * 100)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('cityRank').innerHTML = html || '<div style="padding: 20px; color: #999; text-align: center;">暂无数据</div>';
+        }
+        
+        // 饼图
+        function updatePieChart() {
+            const ranges = {
+                '1-3人': 0,
+                '4-6人': 0,
+                '7-10人': 0,
+                '10人以上': 0
+            };
+            
+            for (let key in classmateData) {
+                const count = classmateData[key].length;
+                if (count >= 1 && count <= 3) ranges['1-3人']++;
+                else if (count >= 4 && count <= 6) ranges['4-6人']++;
+                else if (count >= 7 && count <= 10) ranges['7-10人']++;
+                else if (count > 10) ranges['10人以上']++;
+            }
+            
+            const data = Object.entries(ranges)
+                .filter(item => item[1] > 0)
+                .map(([name, value]) => ({ name, value }));
+            
+            if (data.length === 0) {
+                pieChart.setOption({
+                    title: {
+                        text: '暂无数据',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: { color: '#999', fontSize: 14 }
+                    },
+                    series: []
+                });
+                return;
+            }
+            
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{b}: {c} 个城市 ({d}%)'
+                },
+                series: [{
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 11
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 14,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    data: data,
+                    color: ['#B3D9FF', '#66B2FF', '#1A8CFF', '#0066CC']
+                }]
+            };
+            
+            pieChart.setOption(option);
+        }
+        
+        // 导出数据
+        function exportData() {
+            const dataStr = JSON.stringify(classmateData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `同学分布数据_${new Date().toLocaleDateString()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('数据已导出');
+        }
+        
+        // 清空重置
+        function clearAll() {
+            if (!confirm('确定要清空所有数据吗？此操作不可恢复！')) return;
+            classmateData = {};
+            saveData();
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+            showToast('数据已清空');
+        }
+        
+        // 显示提示
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+        
+        // 窗口大小改变
+        window.addEventListener('resize', () => {
+            myChart.resize();
+            pieChart.resize();
+        });
+        
+        // 点击弹窗外部关闭
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') closeModal();
+        });
+        
+        // 初始化加载
+        loadMap('100000', 'china', '中国');
+    </script>
+</body>
+</html>
