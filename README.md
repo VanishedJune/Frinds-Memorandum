@@ -1,4 +1,4 @@
-<img width="1915" height="924" alt="image" src="https://github.com/user-attachments/assets/96f9d935-947d-4a9e-a721-90af3f0014f6" />
+<img width="1918" height="956" alt="image" src="https://github.com/user-attachments/assets/abf35b36-2c5a-49b9-b967-52f889663e03" />
 
 页面包括中国地图 数据统计 省份排行榜 城市分布排行
 
@@ -12,6 +12,8 @@
 根据城市中添加的好友数量 地图颜色会发生变化
 
 好友数量越多 颜色越深 省级地图同理
+
+同步功能失败，3.0版本可以通过导入导出，在其他平台使用备忘录内容
 
 The page includes a map of China, statistics, province rankings, and city distribution rankings.
 
