@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friends Memorandum - 多端同步版</title>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; overflow: hidden; }
+        #container { width: 100vw; height: 100vh; position: relative; display: flex; }
+        
+        .sidebar { width: 320px; background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 100; }
+        .sidebar-header { padding: 20px; background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%); color: #fff; }
+        .sidebar-header h2 { font-size: 18px; margin-bottom: 15px; }
+        .stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-card .number { font-size: 24px; font-weight: bold; }
+        .stat-card .label { font-size: 12px; opacity: 0.9; }
+        .chart-container { flex: 1; padding: 20px; overflow-y: auto; }
+        .chart-box { margin-bottom: 20px; background: #f8f9fa; border-radius: 12px; padding: 15px; }
+        .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+        .chart { width: 100%; height: 200px; }
+        .rank-list { max-height: 250px; overflow-y: auto; }
+        .rank-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .rank-num { width: 24px; height: 24px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold; }
+        .rank-item.top3 .rank-num { background: #1890ff; color: #fff; }
+        .rank-info { flex: 1; }
+        .rank-name { color: #333; }
+        .rank-count { color: #999; font-size: 12px; }
+        .rank-bar { width: 60px; height: 4px; background: #e0e0e0; border-radius: 2px; margin-left: 10px; }
+        .rank-bar-fill { height: 100%; background: #1890ff; border-radius: 2px; }
+        
+        .map-area { flex: 1; position: relative; display: flex; flex-direction: column; }
+        .maps-wrapper { flex: 1; position: relative; display: flex; }
+        #map { flex: 1; height: 100%; }
+        .overseas-container { position: absolute; bottom: 150px; right: 30px; width: 200px; height: 150px; background: rgba(255,255,255,0.95); border-radius: 12px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .overseas-container:hover { transform: scale(1.05); border-color: #52c41a; }
+        .overseas-header { position: absolute; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%); color: #fff; padding: 8px 12px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; }
+        .overseas-count { background: rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 10px; }
+        #overseasMap { width: 100%; height: 100%; margin-top: 30px; }
+        .overseas-main { flex: 1; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%); }
+        .overseas-main-content { text-align: center; padding: 40px; }
+        .overseas-icon { font-size: 80px; margin-bottom: 20px; }
+        .overseas-title { font-size: 28px; color: #389e0d; margin-bottom: 15px; }
+        .overseas-add-btn { background: #52c41a; color: #fff; border: none; padding: 15px 40px; border-radius: 30px; font-size: 16px; cursor: pointer; transition: all 0.3s; }
+        .overseas-add-btn:hover { background: #389e0d; transform: translateY(-2px); }
+        .overseas-list { margin-top: 30px; max-width: 600px; width: 100%; }
+        .overseas-friend-tag { display: inline-block; background: #fff; color: #389e0d; padding: 8px 16px; border-radius: 20px; margin: 5px; border: 2px solid #b7eb8f; cursor: pointer; }
+        .overseas-friend-tag .delete { margin-left: 8px; color: #ff4d4f; cursor: pointer; font-weight: bold; }
+        
+        .header { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); padding: 15px 30px; border-radius: 30px; z-index: 1000; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 20px; }
+        .back-btn { position: absolute; top: 20px; left: 20px; background: #fff; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; display: none; z-index: 1000; }
+        .back-btn.show { display: block; }
+        .legend { position: absolute; bottom: 30px; right: 250px; background: rgba(255,255,255,0.95); padding: 20px; border-radius: 12px; z-index: 1000; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; }
+        .legend-color { width: 30px; height: 20px; border-radius: 4px; margin-right: 10px; }
+        .actions { position: absolute; bottom: 30px; left: 30px; display: flex; gap: 10px; z-index: 1000; }
+        .action-btn { background: #fff; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; transition: all 0.3s; }
+        .action-btn:hover { background: #1890ff; color: #fff; }
+        
+        .sync-status { position: absolute; top: 20px; right: 30px; background: rgba(255,255,255,0.95); padding: 10px 20px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-size: 13px; z-index: 1000; }
+        .sync-status.online { color: #52c41a; }
+        .sync-status.offline { color: #ff4d4f; }
+        .sync-status.syncing { color: #faad14; }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .sync-btn { background: none; border: none; color: #1890ff; cursor: pointer; font-size: 12px; margin-left: 5px; }
+        .room-id { position: absolute; top: 60px; right: 30px; background: rgba(255,255,255,0.95); padding: 10px 20px; border-radius: 20px; font-size: 13px; cursor: pointer; z-index: 1000; }
+        .room-id:hover { background: #1890ff; color: #fff; }
+        
+        .toast { position: fixed; top: 100px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(0,0,0,0.8); color: #fff; padding: 12px 24px; border-radius: 20px; opacity: 0; transition: all 0.3s; z-index: 3000; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: #fff; padding: 30px; border-radius: 16px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+        .modal-title { font-size: 18px; margin-bottom: 20px; text-align: center; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; color: #666; font-size: 14px; font-weight: 600; }
+        .input-group input, .input-group textarea, .input-group select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .input-group input:focus { outline: none; border-color: #1890ff; }
+        .name-list { max-height: 150px; overflow-y: auto; margin-bottom: 20px; padding: 10px; background: #f5f7fa; border-radius: 8px; }
+        .name-tag { display: inline-block; background: #1890ff; color: #fff; padding: 5px 12px; border-radius: 15px; margin: 5px; font-size: 13px; }
+        .name-tag .delete { margin-left: 8px; cursor: pointer; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .modal-btn.primary { background: #1890ff; color: #fff; }
+        .modal-btn.secondary { background: #f0f0f0; color: #666; }
+        .modal-btn.success { background: #52c41a; color: #fff; }
+        .modal-btn.danger { background: #ff4d4f; color: #fff; }
+        
+        .settings-panel { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 30px; border-radius: 16px; z-index: 2500; width: 90%; max-width: 550px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .settings-panel.show { display: block; }
+        .settings-title { font-size: 18px; margin-bottom: 20px; text-align: center; }
+        .settings-section { margin-bottom: 20px; }
+        .settings-section label { display: block; margin-bottom: 8px; color: #666; font-size: 14px; font-weight: 600; }
+        .settings-section input, .settings-section textarea, .settings-section select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .settings-section .hint { font-size: 12px; color: #999; margin-top: 5px; }
+        .settings-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2400; }
+        .overlay.show { display: block; }
+        .sync-method-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px; }
+        .sync-method-tag.jsonbin { background: #e6f7ff; color: #1890ff; }
+        .sync-method-tag.local { background: #f5f5f5; color: #666; }
+        .test-result { margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 12px; display: none; }
+        .test-result.success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; display: block; }
+        .test-result.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; display: block; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>📊 Statistics</h2>
+                <div class="stat-cards">
+                    <div class="stat-card"><div class="number" id="sidebarTotal">0</div><div class="label">Total Friends</div></div>
+                    <div class="stat-card"><div class="number" id="sidebarCities">0</div><div class="label">Cities</div></div>
+                    <div class="stat-card"><div class="number" id="sidebarProvinces">0</div><div class="label">Provinces</div></div>
+                    <div class="stat-card" style="background: rgba(82,196,26,0.3);"><div class="number" id="sidebarOverseas">0</div><div class="label">Overseas</div></div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-box"><div class="chart-title">🏆 Region Ranking</div><div class="rank-list" id="regionRank"></div></div>
+                <div class="chart-box"><div class="chart-title">🏙️ City Ranking</div><div class="rank-list" id="cityRank"></div></div>
+                <div class="chart-box"><div class="chart-title">📈 Distribution</div><div id="pieChart" class="chart"></div></div>
+            </div>
+        </div>
+        
+        <div class="map-area">
+            <div class="header"><h1>🗺️ Friends Memorandum</h1><div class="stats"><span id="totalCount">0</span> friends in <span id="cityCount">0</span> cities</div></div>
+            <button class="back-btn" id="backBtn" onclick="goBack()">← Back</button>
+            <div class="sync-status" id="syncStatus"><div class="sync-dot"></div><span id="syncText">本地模式</span><button class="sync-btn" onclick="openSettings()">⚙️ 同步设置</button></div>
+            <div class="room-id" id="roomId" onclick="copyRoomId()">📁 同步ID: <span id="roomIdText">default</span></div>
+            <div class="maps-wrapper" id="mapsWrapper"><div id="map"></div><div class="overseas-container" onclick="enterOverseasMode()"><div class="overseas-header"><span>🌍 海外朋友</span><span class="overseas-count" id="overseasMiniCount">0</span></div><div id="overseasMap"></div></div></div>
+            <div class="overseas-main" id="overseasMain" style="display: none;"><div class="overseas-main-content"><div class="overseas-icon">🌏</div><h2 class="overseas-title">海外朋友</h2><button class="overseas-add-btn" onclick="openOverseasModal()">+ 添加海外朋友</button><div class="overseas-list" id="overseasList"></div></div></div>
+            <div class="legend"><h3>📊 图例</h3><div class="legend-item"><div class="legend-color" style="background:#E0E0E0"></div><span>无朋友</span></div><div class="legend-item"><div class="legend-color" style="background:rgba(179,217,255,0.6)"></div><span>1-3人</span></div><div class="legend-item"><div class="legend-color" style="background:rgba(102,178,255,0.7)"></div><span>4-6人</span></div><div class="legend-item"><div class="legend-color" style="background:rgba(26,140,255,0.8)"></div><span>7-10人</span></div><div class="legend-item"><div class="legend-color" style="background:rgba(0,102,204,0.9)"></div><span>10+人</span></div></div>
+            <div class="actions"><button class="action-btn" onclick="exportData()">📥 导出</button><button class="action-btn" onclick="importData()">📤 导入</button><button class="action-btn" onclick="clearAll()">🗑️ 清空</button></div>
+        </div>
+    </div>
+    
+    <div class="modal" id="modal"><div class="modal-content"><h3 class="modal-title">添加朋友</h3><div class="input-group"><label>当前城市: <span id="currentCity" style="color:#1890ff;"></span></label></div><div class="input-group"><label>朋友列表:</label><div class="name-list" id="nameList"></div></div><div class="input-group"><label>输入名字 (用逗号分隔):</label><input type="text" id="nameInput" placeholder="例如: 张三, 李四, 王五" onkeypress="handleEnter(event)"></div><div class="modal-buttons"><button class="modal-btn secondary" onclick="closeModal()">取消</button><button class="modal-btn primary" onclick="addNames()">添加</button></div></div></div>
+    <div class="modal overseas-modal" id="overseasModal"><div class="modal-content"><h3 class="modal-title">管理海外朋友</h3><div class="input-group"><label>朋友列表:</label><div class="name-list" id="overseasNameList"></div></div><div class="input-group"><label>输入名字 (用逗号分隔):</label><input type="text" id="overseasNameInput" placeholder="例如: Tom, Jerry, Mike" onkeypress="handleOverseasEnter(event)"></div><div class="modal-buttons"><button class="modal-btn secondary" onclick="closeOverseasModal()">取消</button><button class="modal-btn success" onclick="addOverseasNames()">添加</button></div></div></div>
+    
+    <div class="overlay" id="overlay" onclick="closeSettings()"></div>
+    <div class="settings-panel" id="settingsPanel">
+        <h3 class="settings-title">☁️ 多端同步设置</h3>
+        
+        <div class="settings-section">
+            <label>同步方式</label>
+            <select id="syncMethod" onchange="onSyncMethodChange()">
+                <option value="local">📁 本地模式 (手动导入/导出)</option>
+                <option value="jsonbin">☁️ JSONBin.io (免费云存储，推荐)</option>
+            </select>
+            <div class="hint">JSONBin.io 是免费 JSON 存储服务，无需配置，开箱即用</div>
+        </div>
+        
+        <div id="jsonbinSettings" style="display: none;">
+            <div class="settings-section">
+                <label>同步ID (房间号)</label>
+                <input type="text" id="binIdInput" placeholder="例如: my-friends-room">
+                <div class="hint">使用相同同步ID的设备将共享数据。首次使用会自动创建。</div>
+            </div>
+            <div class="settings-section">
+                <label>API Key (可选，免费注册获取)</label>
+                <input type="text" id="apiKeyInput" placeholder="留空使用公共API">
+                <div class="hint">访问 jsonbin.io 注册可获取专属 API Key，免费额度更高</div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <button class="modal-btn primary" onclick="testConnection()" style="width:100%">🔌 测试连接</button>
+            <div id="testResult" class="test-result"></div>
+        </div>
+        
+        <div class="settings-section">
+            <button class="modal-btn success" onclick="manualSync()" style="width:100%; margin-top:10px">🔄 立即同步</button>
+        </div>
+        
+        <div class="settings-buttons">
+            <button class="modal-btn secondary" onclick="closeSettings()">关闭</button>
+            <button class="modal-btn danger" onclick="disconnectSync()">断开同步</button>
+            <button class="modal-btn primary" onclick="saveSettings()">保存设置</button>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 数据存储
+        let classmateData = {};
+        let overseasData = [];
+        let currentRoom = 'default';
+        let syncEnabled = false;
+        let syncMethod = 'local';
+        let syncInterval = null;
+        
+        // JSONBin 配置
+        let jsonbinConfig = {
+            binId: '',
+            apiKey: ''
+        };
+        
+        // 地图变量
+        let myChart, pieChart, overseasMiniChart;
+        let mapStack = [{ name: 'china', adcode: '100000', displayName: 'China' }];
+        let currentCityName = '';
+        let isOverseasMode = false;
+        
+        // 获取当前数据对象
+        function getCurrentData() {
+            return {
+                classmateData: classmateData,
+                overseasData: overseasData,
+                lastUpdate: Date.now(),
+                room: currentRoom,
+                version: '2.0'
+            };
+        }
+        
+        // JSONBin 同步 - 上传数据
+        async function syncToJSONBin() {
+            if (syncMethod !== 'jsonbin') return false;
+            
+            try {
+                const data = getCurrentData();
+                const url = jsonbinConfig.binId 
+                    ? `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}`
+                    : 'https://api.jsonbin.io/v3/b';
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': '$2a$10$YOUR_MASTER_KEY' // 公共密钥
+                };
+                
+                if (jsonbinConfig.apiKey) {
+                    headers['X-Master-Key'] = jsonbinConfig.apiKey;
+                }
+                
+                let response;
+                if (jsonbinConfig.binId) {
+                    // 更新已有 bin
+                    response = await fetch(url, {
+                        method: 'PUT',
+                        headers: headers,
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // 创建新 bin
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            ...headers,
+                            'X-Bin-Name': `friends_${currentRoom}`
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        jsonbinConfig.binId = result.metadata?.id;
+                        if (jsonbinConfig.binId) {
+                            localStorage.setItem('jsonbin_binId', jsonbinConfig.binId);
+                        }
+                    }
+                }
+                
+                if (response.ok) {
+                    updateSyncStatus('online', '已同步(JSONBin)');
+                    return true;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch(e) {
+                console.error('JSONBin sync error:', e);
+                updateSyncStatus('offline', '同步失败');
+                return false;
+            }
+        }
+        
+        // JSONBin 同步 - 拉取数据
+        async function syncFromJSONBin() {
+            if (syncMethod !== 'jsonbin' || !jsonbinConfig.binId) return false;
+            
+            try {
+                const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}/latest`;
+                const headers = {};
+                if (jsonbinConfig.apiKey) {
+                    headers['X-Master-Key'] = jsonbinConfig.apiKey;
+                }
+                
+                const response = await fetch(url, { headers });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const result = await response.json();
+                const data = result.record;
+                
+                if (data && data.classmateData) {
+                    const localHash = JSON.stringify({ classmateData, overseasData });
+                    const remoteHash = JSON.stringify({ classmateData: data.classmateData, overseasData: data.overseasData });
+                    
+                    if (localHash !== remoteHash) {
+                        classmateData = data.classmateData;
+                        overseasData = data.overseasData;
+                        saveLocalData();
+                        refreshUI();
+                        showToast('已从云端同步');
+                    }
+                }
+                updateSyncStatus('online', '已同步(JSONBin)');
+                return true;
+            } catch(e) {
+                console.error('JSONBin pull error:', e);
+                return false;
+            }
+        }
+        
+        // 手动同步
+        async function manualSync() {
+            if (syncMethod === 'jsonbin') {
+                showToast('正在同步...');
+                await syncToJSONBin();
+                await syncFromJSONBin();
+            } else {
+                showToast('本地模式，请使用导出/导入功能手动同步');
+            }
+        }
+        
+        // 测试连接
+        async function testConnection() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'test-result';
+            resultDiv.innerHTML = '🔄 测试中...';
+            resultDiv.style.display = 'block';
+            
+            if (syncMethod === 'jsonbin') {
+                try {
+                    const testData = { test: 'connection', time: Date.now() };
+                    const response = await fetch('https://api.jsonbin.io/v3/b', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Bin-Name': 'test_connection'
+                        },
+                        body: JSON.stringify(testData)
+                    });
+                    
+                    if (response.ok) {
+                        resultDiv.className = 'test-result success';
+                        resultDiv.innerHTML = '✅ JSONBin 连接成功！可以正常使用云同步功能。';
+                    } else {
+                        resultDiv.className = 'test-result error';
+                        resultDiv.innerHTML = `❌ 连接失败 (${response.status})，请稍后重试。`;
+                    }
+                } catch(e) {
+                    resultDiv.className = 'test-result error';
+                    resultDiv.innerHTML = `❌ 网络错误：${e.message}<br>请检查网络连接后重试。`;
+                }
+            } else {
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = '✅ 本地模式，数据保存在浏览器中。可通过导出/导入功能手动同步到其他设备。';
+            }
+        }
+        
+        function onSyncMethodChange() {
+            const method = document.getElementById('syncMethod').value;
+            const jsonbinDiv = document.getElementById('jsonbinSettings');
+            jsonbinDiv.style.display = method === 'jsonbin' ? 'block' : 'none';
+        }
+        
+        function startSync() {
+            if (syncInterval) clearInterval(syncInterval);
+            
+            if (syncMethod === 'jsonbin' && jsonbinConfig.binId) {
+                syncToJSONBin().then(() => {
+                    setTimeout(() => syncFromJSONBin(), 1000);
+                });
+                syncInterval = setInterval(() => {
+                    syncFromJSONBin();
+                }, 15000);
+            }
+        }
+        
+        function stopSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+        }
+        
+        function updateSyncStatus(status, text) {
+            const statusEl = document.getElementById('syncStatus');
+            const textEl = document.getElementById('syncText');
+            statusEl.className = 'sync-status ' + status;
+            textEl.textContent = text;
+        }
+        
+        function openSettings() {
+            document.getElementById('settingsPanel').classList.add('show');
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('syncMethod').value = syncMethod;
+            document.getElementById('binIdInput').value = jsonbinConfig.binId || '';
+            document.getElementById('apiKeyInput').value = jsonbinConfig.apiKey || '';
+            onSyncMethodChange();
+            document.getElementById('testResult').className = 'test-result';
+            document.getElementById('testResult').style.display = 'none';
+        }
+        
+        function closeSettings() {
+            document.getElementById('settingsPanel').classList.remove('show');
+            document.getElementById('overlay').classList.remove('show');
+        }
+        
+        function disconnectSync() {
+            stopSync();
+            syncEnabled = false;
+            syncMethod = 'local';
+            saveSettingsToLocal();
+            updateSyncStatus('offline', '本地模式');
+            showToast('已断开同步，数据仅保存在本地');
+            closeSettings();
+        }
+        
+        function saveSettingsToLocal() {
+            localStorage.setItem('sync_method', syncMethod);
+            localStorage.setItem('sync_room', currentRoom);
+            localStorage.setItem('jsonbin_binId', jsonbinConfig.binId);
+            localStorage.setItem('jsonbin_apiKey', jsonbinConfig.apiKey);
+            localStorage.setItem('sync_enabled', syncEnabled);
+        }
+        
+        function loadSettings() {
+            try {
+                const savedMethod = localStorage.getItem('sync_method');
+                if (savedMethod) syncMethod = savedMethod;
+                
+                const savedRoom = localStorage.getItem('sync_room');
+                if (savedRoom) currentRoom = savedRoom;
+                document.getElementById('roomIdText').textContent = currentRoom;
+                
+                const savedBinId = localStorage.getItem('jsonbin_binId');
+                if (savedBinId) jsonbinConfig.binId = savedBinId;
+                
+                const savedApiKey = localStorage.getItem('jsonbin_apiKey');
+                if (savedApiKey) jsonbinConfig.apiKey = savedApiKey;
+                
+                const savedEnabled = localStorage.getItem('sync_enabled');
+                syncEnabled = savedEnabled === 'true';
+                
+                if (syncEnabled && syncMethod === 'jsonbin') {
+                    startSync();
+                    updateSyncStatus('syncing', '连接中...');
+                }
+            } catch(e) { console.error(e); }
+        }
+        
+        function saveSettings() {
+            syncMethod = document.getElementById('syncMethod').value;
+            jsonbinConfig.binId = document.getElementById('binIdInput').value.trim();
+            jsonbinConfig.apiKey = document.getElementById('apiKeyInput').value.trim();
+            
+            syncEnabled = (syncMethod === 'jsonbin');
+            saveSettingsToLocal();
+            
+            if (syncEnabled) {
+                stopSync();
+                startSync();
+                updateSyncStatus('syncing', '连接中...');
+                showToast('云同步已启用');
+            } else {
+                stopSync();
+                updateSyncStatus('offline', '本地模式');
+                showToast('已切换到本地模式');
+            }
+            closeSettings();
+        }
+        
+        function copyRoomId() {
+            navigator.clipboard.writeText(currentRoom);
+            showToast('同步ID已复制: ' + currentRoom);
+        }
+        
+        function saveLocalData() {
+            localStorage.setItem('classmateMap_backup', JSON.stringify(classmateData));
+            localStorage.setItem('overseasData_backup', JSON.stringify(overseasData));
+        }
+        
+        function loadLocalData() {
+            try {
+                const savedData = localStorage.getItem('classmateMap_backup');
+                const savedOverseas = localStorage.getItem('overseasData_backup');
+                classmateData = savedData ? JSON.parse(savedData) : {};
+                overseasData = savedOverseas ? JSON.parse(savedOverseas) : [];
+            } catch(e) { console.error(e); }
+        }
+        
+        function refreshUI() {
+            if (!isOverseasMode) {
+                const current = mapStack[mapStack.length - 1];
+                loadMap(current.adcode, current.name, current.displayName);
+            } else {
+                updateOverseasList();
+            }
+            updateOverseasMiniMap();
+            updateAllStats();
+        }
+        
+        // 地图功能
+        async function loadMap(adcode, name, displayName) {
+            try {
+                const url = `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error();
+                const geoJson = await response.json();
+                echarts.registerMap(name, geoJson);
+                
+                const nameMap = {};
+                geoJson.features.forEach(f => { nameMap[f.properties.name] = { adcode: f.properties.adcode }; });
+                
+                const mapData = Object.keys(nameMap).map(regionName => {
+                    let count = displayName === 'China' ? getProvinceTotalCount(regionName) : getStudentCount(displayName, regionName);
+                    return { name: regionName, value: count, itemStyle: { areaColor: getColorByCount(count) } };
+                });
+                
+                const option = {
+                    tooltip: { trigger: 'item', formatter: params => `${params.name}<br/>朋友数: ${params.value || 0}` },
+                    series: [{ type: 'map', map: name, roam: true, zoom: 1.2, data: mapData, label: { show: true, fontSize: 10 } }]
+                };
+                if (myChart) {
+                    myChart.setOption(option, true);
+                    myChart.off('click');
+                    myChart.on('click', async params => {
+                        const info = nameMap[params.name];
+                        if (!info) return;
+                        const testUrl = `https://geo.datav.aliyun.com/areas_v3/bound/${info.adcode}_full.json`;
+                        const testRes = await fetch(testUrl, { method: 'HEAD' });
+                        if (testRes.ok && displayName === 'China') {
+                            mapStack.push({ name: params.name, adcode: info.adcode, displayName: params.name });
+                            document.getElementById('backBtn').classList.add('show');
+                            loadMap(info.adcode, params.name, params.name);
+                        } else {
+                            openModal(params.name);
+                        }
+                    });
+                }
+                updateAllStats();
+            } catch(e) { showToast('地图加载失败'); }
+        }
+        
+        function getColorByCount(c) {
+            if (c === 0) return '#E0E0E0';
+            if (c <= 3) return 'rgba(179,217,255,0.6)';
+            if (c <= 6) return 'rgba(102,178,255,0.7)';
+            if (c <= 10) return 'rgba(26,140,255,0.8)';
+            return 'rgba(0,102,204,0.9)';
+        }
+        
+        function getProvinceTotalCount(province) {
+            let total = 0;
+            for (let key in classmateData) {
+                if (key === province || key.startsWith(province + '-')) total += classmateData[key].length;
+            }
+            return total;
+        }
+        
+        function getStudentCount(province, city) {
+            const key = province === 'China' ? city : `${province}-${city}`;
+            return (classmateData[key] || []).length;
+        }
+        
+        function goBack() {
+            if (isOverseasMode) { exitOverseasMode(); return; }
+            if (mapStack.length <= 1) return;
+            mapStack.pop();
+            const prev = mapStack[mapStack.length - 1];
+            loadMap(prev.adcode, prev.name, prev.displayName);
+            if (mapStack.length === 1) document.getElementById('backBtn').classList.remove('show');
+        }
+        
+        function openModal(city) {
+            currentCityName = city;
+            const province = mapStack[mapStack.length - 1].displayName;
+            const key = province === 'China' ? city : `${province}-${city}`;
+            const names = classmateData[key] || [];
+            document.getElementById('currentCity').textContent = city;
+            updateNameList(names);
+            document.getElementById('modal').classList.add('show');
+        }
+        
+        function closeModal() { document.getElementById('modal').classList.remove('show'); document.getElementById('nameInput').value = ''; }
+        
+        function updateNameList(names) {
+            const container = document.getElementById('nameList');
+            if (!names.length) { container.innerHTML = '<span style="color:#999;">暂无朋友</span>'; return; }
+            container.innerHTML = names.map((n, i) => `<span class="name-tag">${escapeHtml(n)}<span class="delete" onclick="deleteName(${i})">×</span></span>`).join('');
+        }
+        
+        function escapeHtml(str) { return str.replace(/[&<>]/g, function(m) { if(m === '&') return '&amp;'; if(m === '<') return '&lt;'; if(m === '>') return '&gt;'; return m; }); }
+        
+        function addNames() {
+            const input = document.getElementById('nameInput');
+            const value = input.value.trim();
+            if (!value) return;
+            const province = mapStack[mapStack.length - 1].displayName;
+            const key = province === 'China' ? currentCityName : `${province}-${currentCityName}`;
+            if (!classmateData[key]) classmateData[key] = [];
+            const newNames = value.split(/[,，]/).map(n => n.trim()).filter(n => n);
+            classmateData[key].push(...newNames);
+            saveLocalData();
+            if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin();
+            updateNameList(classmateData[key]);
+            input.value = '';
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+            showToast(`添加 ${newNames.length} 位朋友`);
+        }
+        
+        function deleteName(idx) {
+            const province = mapStack[mapStack.length - 1].displayName;
+            const key = province === 'China' ? currentCityName : `${province}-${currentCityName}`;
+            classmateData[key].splice(idx, 1);
+            if (!classmateData[key].length) delete classmateData[key];
+            saveLocalData();
+            if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin();
+            updateNameList(classmateData[key] || []);
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+        }
+        
+        function handleEnter(e) { if (e.key === 'Enter') addNames(); }
+        
+        // 海外功能
+        function initOverseasMiniMap() {
+            if (!overseasMiniChart) {
+                const dom = document.getElementById('overseasMap');
+                if (dom) overseasMiniChart = echarts.init(dom);
+            }
+            updateOverseasMiniMap();
+        }
+        
+        function updateOverseasMiniMap() {
+            if (!overseasMiniChart) return;
+            const count = overseasData.length;
+            document.getElementById('overseasMiniCount').textContent = count;
+            const color = count === 0 ? '#E0E0E0' : count <= 3 ? '#b7eb8f' : count <= 6 ? '#95de64' : '#52c41a';
+            overseasMiniChart.setOption({
+                series: [{ type: 'pie', radius: ['40%', '70%'], data: [{ value: Math.max(count, 1), name: '朋友', itemStyle: { color } }], label: { show: false } }]
+            });
+        }
+        
+        function enterOverseasMode() {
+            isOverseasMode = true;
+            document.getElementById('mapsWrapper').style.display = 'none';
+            document.getElementById('overseasMain').style.display = 'flex';
+            document.getElementById('legend').style.display = 'none';
+            document.getElementById('backBtn').classList.add('show');
+            updateOverseasList();
+        }
+        
+        function exitOverseasMode() {
+            isOverseasMode = false;
+            document.getElementById('mapsWrapper').style.display = 'flex';
+            document.getElementById('overseasMain').style.display = 'none';
+            document.getElementById('legend').style.display = 'block';
+            document.getElementById('backBtn').classList.remove('show');
+            const current = mapStack[mapStack.length - 1];
+            loadMap(current.adcode, current.name, current.displayName);
+        }
+        
+        function updateOverseasList() {
+            const container = document.getElementById('overseasList');
+            if (!overseasData.length) { container.innerHTML = '<p style="color:#999;">暂无海外朋友</p>'; return; }
+            container.innerHTML = overseasData.map((n, i) => `<span class="overseas-friend-tag">${escapeHtml(n)}<span class="delete" onclick="deleteOverseasFriend(${i})">×</span></span>`).join('');
+        }
+        
+        function openOverseasModal() {
+            updateOverseasNameList();
+            document.getElementById('overseasModal').classList.add('show');
+        }
+        
+        function closeOverseasModal() { document.getElementById('overseasModal').classList.remove('show'); document.getElementById('overseasNameInput').value = ''; }
+        
+        function updateOverseasNameList() {
+            const container = document.getElementById('overseasNameList');
+            if (!overseasData.length) { container.innerHTML = '<span style="color:#999;">暂无海外朋友</span>'; return; }
+            container.innerHTML = overseasData.map((n, i) => `<span class="name-tag">${escapeHtml(n)}<span class="delete" onclick="deleteOverseasFromModal(${i})">×</span></span>`).join('');
+        }
+        
+        function addOverseasNames() {
+            const input = document.getElementById('overseasNameInput');
+            const value = input.value.trim();
+            if (!value) return;
+            const newNames = value.split(/[,，]/).map(n => n.trim()).filter(n => n);
+            overseasData.push(...newNames);
+            saveLocalData();
+            if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin();
+            updateOverseasNameList();
+            updateOverseasList();
+            updateOverseasMiniMap();
+            updateAllStats();
+            input.value = '';
+            showToast(`添加 ${newNames.length} 位海外朋友`);
+        }
+        
+        function deleteOverseasFriend(idx) { overseasData.splice(idx, 1); saveLocalData(); if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin(); updateOverseasList(); updateOverseasMiniMap(); updateAllStats(); }
+        function deleteOverseasFromModal(idx) { overseasData.splice(idx, 1); saveLocalData(); if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin(); updateOverseasNameList(); updateOverseasList(); updateOverseasMiniMap(); updateAllStats(); }
+        function handleOverseasEnter(e) { if (e.key === 'Enter') addOverseasNames(); }
+        
+        // 统计
+        function updateAllStats() {
+            let total = 0, cities = 0, provinces = new Set();
+            for (let key in classmateData) {
+                const cnt = classmateData[key].length;
+                if (cnt > 0) { total += cnt; cities++; key.includes('-') ? provinces.add(key.split('-')[0]) : provinces.add(key); }
+            }
+            total += overseasData.length;
+            if (overseasData.length) cities++;
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('cityCount').textContent = cities;
+            document.getElementById('sidebarTotal').textContent = total;
+            document.getElementById('sidebarCities').textContent = cities;
+            document.getElementById('sidebarProvinces').textContent = provinces.size;
+            document.getElementById('sidebarOverseas').textContent = overseasData.length;
+            
+            updateRegionRank();
+            updateCityRank();
+            updatePieChart();
+        }
+        
+        function updateRegionRank() {
+            const stats = {};
+            for (let key in classmateData) {
+                const cnt = classmateData[key].length;
+                if (cnt > 0) { const region = key.includes('-') ? key.split('-')[0] : key; stats[region] = (stats[region] || 0) + cnt; }
+            }
+            if (overseasData.length) stats['🌍 海外'] = overseasData.length;
+            const sorted = Object.entries(stats).sort((a,b)=>b[1]-a[1]).slice(0,10);
+            const max = sorted[0]?.[1] || 1;
+            const container = document.getElementById('regionRank');
+            if (!sorted.length) { container.innerHTML = '<div style="padding:20px;color:#999;">暂无数据</div>'; return; }
+            container.innerHTML = sorted.map(([name, cnt], i) => `<div class="rank-item ${i<3?'top3':''}"><div class="rank-num">${i+1}</div><div class="rank-info"><div class="rank-name">${name}</div><div class="rank-count">${cnt} 人</div></div><div class="rank-bar"><div class="rank-bar-fill" style="width:${cnt/max*100}%"></div></div></div>`).join('');
+        }
+        
+        function updateCityRank() {
+            const stats = [];
+            for (let key in classmateData) {
+                const cnt = classmateData[key].length;
+                if (cnt > 0) stats.push({ name: key.includes('-') ? key.split('-')[1] : key, count: cnt });
+            }
+            if (overseasData.length) stats.push({ name: '🌍 海外', count: overseasData.length });
+            const sorted = stats.sort((a,b)=>b.count-a.count).slice(0,10);
+            const max = sorted[0]?.count || 1;
+            const container = document.getElementById('cityRank');
+            if (!sorted.length) { container.innerHTML = '<div style="padding:20px;color:#999;">暂无数据</div>'; return; }
+            container.innerHTML = sorted.map((item, i) => `<div class="rank-item ${i<3?'top3':''}"><div class="rank-num">${i+1}</div><div class="rank-info"><div class="rank-name">${item.name}</div><div class="rank-count">${item.count} 人</div></div><div class="rank-bar"><div class="rank-bar-fill" style="width:${item.count/max*100}%"></div></div></div>`).join('');
+        }
+        
+        function updatePieChart() {
+            if (!pieChart) pieChart = echarts.init(document.getElementById('pieChart'));
+            const ranges = { '1-3人':0, '4-6人':0, '7-10人':0, '10+人':0 };
+            for (let key in classmateData) {
+                const cnt = classmateData[key].length;
+                if (cnt > 0) { if (cnt<=3) ranges['1-3人']++; else if(cnt<=6) ranges['4-6人']++; else if(cnt<=10) ranges['7-10人']++; else ranges['10+人']++; }
+            }
+            let data = Object.entries(ranges).filter(([_,v])=>v>0).map(([n,v])=>({name:n, value:v}));
+            if (overseasData.length) data.push({name:'🌍 海外', value:1, itemStyle:{color:'#52c41a'}});
+            if (data.length === 0) { pieChart.setOption({ title: { text: '暂无数据', left: 'center', top: 'center' }, series: [] }); return; }
+            pieChart.setOption({ series: [{ type: 'pie', radius: ['40%','70%'], data }] });
+        }
+        
+        function initCharts() {
+            myChart = echarts.init(document.getElementById('map'));
+            pieChart = echarts.init(document.getElementById('pieChart'));
+            overseasMiniChart = echarts.init(document.getElementById('overseasMap'));
+            window.addEventListener('resize', () => { myChart?.resize(); pieChart?.resize(); overseasMiniChart?.resize(); });
+        }
+        
+        function exportData() {
+            const blob = new Blob([JSON.stringify({ classmateData, overseasData, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `friends_${currentRoom}_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            showToast('导出成功');
+        }
+        
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (data.classmateData) classmateData = data.classmateData;
+                        if (data.overseasData) overseasData = data.overseasData;
+                        saveLocalData();
+                        if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin();
+                        refreshUI();
+                        showToast('导入成功');
+                    } catch(err) { showToast('导入失败'); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+        
+        function clearAll() {
+            if (!confirm('确认清空所有数据？不可恢复！')) return;
+            classmateData = {};
+            overseasData = [];
+            saveLocalData();
+            if (syncEnabled && syncMethod === 'jsonbin') syncToJSONBin();
+            refreshUI();
+            showToast('已清空');
+        }
+        
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+        
+        // 事件绑定
+        document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+        document.getElementById('overseasModal').addEventListener('click', e => { if (e.target.id === 'overseasModal') closeOverseasModal(); });
+        
+        // 初始化
+        loadLocalData();
+        initCharts();
+        loadSettings();
+        loadMap('100000', 'china', 'China');
+        updateAllStats();
+        initOverseasMiniMap();
+    </script>
+</body>
+</html>
